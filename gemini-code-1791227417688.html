@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneo Smash Bros - Doble Eliminación</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .match-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .match-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); }
+        .neon-text { text-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
+        .neon-border { box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
+        
+        /* Scrollbar oscuro */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 min-h-screen">
+
+    <header class="bg-gradient-to-b from-red-800 to-red-950 text-white p-5 shadow-2xl text-center border-b-4 border-yellow-500">
+        <h1 class="text-4xl font-black uppercase tracking-widest neon-text">🔥 Smash Bros 🔥</h1>
+        <p class="text-sm text-yellow-400 font-bold mt-1 tracking-wide">DOBLE ELIMINACIÓN + PRIZE POOL</p>
+    </header>
+
+    <main class="container mx-auto p-4 max-w-6xl mt-6">
+        
+        <!-- Pantalla de Configuración -->
+        <div id="setup" class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md mx-auto text-center border border-gray-700">
+            <h2 class="text-2xl font-bold mb-6 text-white uppercase tracking-wide">Configurar Torneo</h2>
+            
+            <div class="mb-5 text-left">
+                <label class="block text-sm font-bold text-gray-400 mb-2 uppercase">💰 Cuota por jugador (COP):</label>
+                <input type="number" id="entryFee" value="1000" min="0" step="500" class="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-3 text-white font-bold text-lg focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors">
+            </div>
+
+            <div class="mb-6 text-left">
+                <label class="block text-sm font-bold text-gray-400 mb-2 uppercase">🎮 Jugadores (4 a 8):</label>
+                <p class="text-xs text-gray-500 mb-2">Ingresa un nombre por línea</p>
+                <textarea id="playersInput" rows="6" class="w-full bg-gray-900 border-2 border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors resize-none" placeholder="Mario&#10;Luigi&#10;Link&#10;Zelda&#10;Kirby"></textarea>
+            </div>
+            
+            <button onclick="initTournament()" class="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-black py-4 px-4 rounded-lg shadow-lg text-lg uppercase tracking-wider transform transition hover:scale-105">
+                ¡Empezar Torneo!
+            </button>
+        </div>
+
+        <!-- Pantalla Principal del Torneo -->
+        <div id="tournament" class="hidden">
+            
+            <!-- Resumen del Pozo (Prize Pool) -->
+            <div class="bg-gray-800 border border-yellow-500/30 rounded-lg p-4 mb-6 flex justify-between items-center shadow-lg">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl">💰</span>
+                    <div>
+                        <p class="text-xs text-gray-400 uppercase font-bold">Pozo Acumulado</p>
+                        <p id="displayTotalPot" class="text-2xl font-black text-yellow-400"></p>
+                    </div>
+                </div>
+                <div class="text-right text-xs md:text-sm text-gray-400 font-medium">
+                    <p><span class="text-yellow-400 font-bold">1º</span> 60% <span class="mx-1">|</span> <span class="text-gray-300 font-bold">2º</span> 30% <span class="mx-1">|</span> <span class="text-orange-400 font-bold">3º</span> 10%</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                
+                <!-- Zona del Televisor (Partido Actual) -->
+                <div class="lg:col-span-2 bg-gray-800 rounded-xl shadow-2xl p-6 border-2 border-red-600 relative neon-border">
+                    <div class="absolute top-0 left-0 bg-red-600 text-white px-4 py-1.5 rounded-br-lg text-sm font-black tracking-widest shadow-md">
+                        📺 EN EL TV (JUGANDO AHORA)
+                    </div>
+                    <div id="activeMatch" class="mt-8">
+                        <!-- El partido actual se renderiza aquí -->
+                    </div>
+                </div>
+
+                <!-- Zona de Fila de Espera -->
+                <div class="bg-gray-800 rounded-xl shadow-xl p-5 border border-gray-700">
+                    <h3 class="font-bold text-gray-300 mb-4 uppercase text-sm border-b border-gray-600 pb-2 flex items-center gap-2">
+                        <span>⏳</span> Próximos Partidos
+                    </h3>
+                    <ul id="queuedMatches" class="space-y-3">
+                        <!-- Los partidos en cola se renderizan aquí -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Zona de Cuadros (Visualización Global) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Winners -->
+                <div class="bg-gray-800 p-5 rounded-xl shadow-lg border-t-4 border-blue-500">
+                    <h3 class="font-black text-blue-400 mb-1 uppercase text-center tracking-wide">🏆 Cuadro Winners</h3>
+                    <p class="text-xs text-gray-500 mb-4 text-center font-bold">(0 Derrotas)</p>
+                    <ul id="listWinners" class="divide-y divide-gray-700 font-medium text-center"></ul>
+                </div>
+
+                <!-- Losers -->
+                <div class="bg-gray-800 p-5 rounded-xl shadow-lg border-t-4 border-orange-500">
+                    <h3 class="font-black text-orange-400 mb-1 uppercase text-center tracking-wide">🔥 Cuadro Losers</h3>
+                    <p class="text-xs text-gray-500 mb-4 text-center font-bold">(1 Derrota - Riesgo de eliminación)</p>
+                    <ul id="listLosers" class="divide-y divide-gray-700 font-medium text-center"></ul>
+                </div>
+
+                <!-- Eliminados -->
+                <div class="bg-gray-900 p-5 rounded-xl shadow-inner border-t-4 border-gray-600 opacity-80">
+                    <h3 class="font-black text-gray-400 mb-1 uppercase text-center tracking-wide">💀 Eliminados</h3>
+                    <p class="text-xs text-gray-600 mb-4 text-center font-bold">(2 Derrotas)</p>
+                    <ul id="listEliminados" class="divide-y divide-gray-800 text-gray-500 text-center"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de Podio / Resultados -->
+        <div id="championScreen" class="hidden text-center py-12 bg-gray-800 rounded-xl shadow-2xl border-4 border-yellow-500 max-w-4xl mx-auto neon-border">
+            <h1 class="text-4xl md:text-5xl font-black text-white uppercase tracking-widest mb-12">🏆 Resultados Finales 🏆</h1>
+            
+            <div class="flex flex-col md:flex-row justify-center items-end gap-4 md:gap-6 mb-12 h-72 px-4">
+                <!-- 2do Lugar -->
+                <div class="w-full md:w-1/3 bg-gray-700 rounded-t-xl border-t-4 border-gray-400 flex flex-col items-center justify-end h-3/4 pb-6 shadow-inner relative">
+                    <div class="absolute -top-6 text-5xl">🥈</div>
+                    <span id="podium2" class="font-bold text-2xl text-white mb-1"></span>
+                    <span class="text-sm text-gray-300 font-bold uppercase tracking-wider">2do Lugar</span>
+                    <div class="mt-3 bg-gray-900 px-4 py-2 rounded-lg border border-gray-600">
+                        <span id="prize2" class="text-gray-300 font-black text-lg"></span>
+                    </div>
+                </div>
+                <!-- 1er Lugar -->
+                <div class="w-full md:w-1/3 bg-gradient-to-t from-gray-700 to-gray-600 rounded-t-xl border-t-4 border-yellow-400 flex flex-col items-center justify-end h-full pb-6 shadow-2xl z-10 relative">
+                    <div class="absolute -top-8 text-7xl animate-bounce">👑</div>
+                    <span id="podium1" class="font-black text-3xl text-yellow-400 mb-1"></span>
+                    <span class="text-sm text-yellow-500 font-black uppercase tracking-wider">1er Lugar</span>
+                    <div class="mt-3 bg-gray-900 px-5 py-2 rounded-lg border border-yellow-500/50">
+                        <span id="prize1" class="text-yellow-400 font-black text-xl"></span>
+                    </div>
+                </div>
+                <!-- 3er Lugar -->
+                <div class="w-full md:w-1/3 bg-gray-700 rounded-t-xl border-t-4 border-orange-500 flex flex-col items-center justify-end h-2/3 pb-6 shadow-inner relative">
+                    <div class="absolute -top-6 text-5xl">🥉</div>
+                    <span id="podium3" class="font-bold text-2xl text-white mb-1"></span>
+                    <span class="text-sm text-orange-400 font-bold uppercase tracking-wider">3er Lugar</span>
+                    <div class="mt-3 bg-gray-900 px-4 py-2 rounded-lg border border-gray-600">
+                        <span id="prize3" class="text-orange-400 font-black text-lg"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="location.reload()" class="mt-6 bg-red-600 hover:bg-red-700 text-white font-black py-4 px-10 rounded-lg shadow-lg uppercase tracking-wider transition-transform hover:scale-105">
+                Organizar otro torneo
+            </button>
+        </div>
+
+    </main>
+
+    <script>
+        let poolWinners = [];
+        let poolLosers = [];
+        let poolEliminados = [];
+        let eliminationOrder = [];
+        let matchQueue = [];
+        let champion = null;
+        let matchCounter = 1;
+        
+        // Variables de Premios
+        let potInfo = { total: 0, p1: 0, p2: 0, p3: 0 };
+
+        // Formateador de moneda COP
+        const formatCOP = (value) => {
+            return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+        };
+
+        function initTournament() {
+            const input = document.getElementById('playersInput').value;
+            const names = input.split('\n').map(n => n.trim()).filter(n => n);
+            const fee = parseInt(document.getElementById('entryFee').value) || 0;
+            
+            if (names.length < 4 || names.length > 8) {
+                alert("Por favor ingresa entre 4 y 8 jugadores (uno por línea).");
+                return;
+            }
+
+            // Calcular premios
+            potInfo.total = fee * names.length;
+            potInfo.p1 = potInfo.total * 0.60;
+            potInfo.p2 = potInfo.total * 0.30;
+            potInfo.p3 = potInfo.total * 0.10;
+
+            document.getElementById('displayTotalPot').innerText = formatCOP(potInfo.total);
+
+            // Iniciar torneo
+            poolWinners = names.sort(() => Math.random() - 0.5);
+            
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById('tournament').classList.remove('hidden');
+            
+            checkAvailableMatches();
+            render();
+        }
+
+        function checkAvailableMatches() {
+            while (poolWinners.length >= 2) {
+                matchQueue.push({
+                    id: matchCounter++, type: 'Winners',
+                    p1: poolWinners.shift(), p2: poolWinners.shift()
+                });
+            }
+            
+            while (poolLosers.length >= 2) {
+                matchQueue.push({
+                    id: matchCounter++, type: 'Losers',
+                    p1: poolLosers.shift(), p2: poolLosers.shift()
+                });
+            }
+
+            if (matchQueue.length === 0) {
+                if (poolWinners.length === 1 && poolLosers.length === 1) {
+                    matchQueue.push({
+                        id: matchCounter++, type: 'Gran Final',
+                        p1: poolWinners.shift(), p2: poolLosers.shift()
+                    });
+                } else if (poolWinners.length === 0 && poolLosers.length === 2) {
+                    matchQueue.push({
+                        id: matchCounter++, type: 'Gran Final (Reinicio)',
+                        p1: poolLosers.shift(), p2: poolLosers.shift()
+                    });
+                } else if (poolWinners.length === 1 && poolLosers.length === 0) {
+                    champion = poolWinners[0];
+                } else if (poolWinners.length === 0 && poolLosers.length === 1) {
+                    champion = poolLosers[0];
+                }
+            }
+        }
+
+        function reportWin(matchId, winnerSlot) {
+            const matchIndex = matchQueue.findIndex(m => m.id === matchId);
+            const match = matchQueue[matchIndex];
+            matchQueue.splice(matchIndex, 1); 
+
+            const winner = winnerSlot === 'p1' ? match.p1 : match.p2;
+            const loser = winnerSlot === 'p1' ? match.p2 : match.p1;
+
+            if (match.type === 'Winners') {
+                poolWinners.push(winner);
+                poolLosers.push(loser); 
+            } else if (match.type === 'Losers') {
+                poolLosers.push(winner);
+                poolEliminados.push(loser);
+                eliminationOrder.push(loser);
+            } else if (match.type === 'Gran Final') {
+                if (winner === match.p1) { 
+                    champion = winner;
+                    eliminationOrder.push(loser);
+                } else { 
+                    poolLosers.push(match.p1);
+                    poolLosers.push(match.p2);
+                }
+            } else if (match.type === 'Gran Final (Reinicio)') {
+                champion = winner;
+                eliminationOrder.push(loser);
+            }
+
+            checkAvailableMatches();
+            render();
+        }
+
+        function render() {
+            if (champion) {
+                document.getElementById('tournament').classList.add('hidden');
+                document.getElementById('championScreen').classList.remove('hidden');
+                
+                // Nombres Podio
+                document.getElementById('podium1').innerText = champion;
+                document.getElementById('podium2').innerText = eliminationOrder[eliminationOrder.length - 1] || '---';
+                document.getElementById('podium3').innerText = eliminationOrder[eliminationOrder.length - 2] || '---';
+                
+                // Premios Podio
+                document.getElementById('prize1').innerText = formatCOP(potInfo.p1);
+                document.getElementById('prize2').innerText = formatCOP(potInfo.p2);
+                document.getElementById('prize3').innerText = formatCOP(potInfo.p3);
+                return;
+            }
+
+            const activeMatchContainer = document.getElementById('activeMatch');
+            const queuedMatchesContainer = document.getElementById('queuedMatches');
+            
+            // Reconstruir listas globales visuales
+            let displayWinners = [...poolWinners];
+            let displayLosers = [...poolLosers];
+
+            matchQueue.forEach(m => {
+                if (m.type === 'Winners') { displayWinners.push(m.p1, m.p2); } 
+                else if (m.type === 'Losers') { displayLosers.push(m.p1, m.p2); } 
+                else if (m.type === 'Gran Final') { displayWinners.push(m.p1); displayLosers.push(m.p2); } 
+                else if (m.type === 'Gran Final (Reinicio)') { displayLosers.push(m.p1, m.p2); }
+            });
+            
+            if (matchQueue.length > 0) {
+                const currentMatch = matchQueue[0];
+                let bgClass = 'bg-gray-900 border-blue-500/50';
+                let accentColor = 'text-blue-400';
+                
+                if (currentMatch.type === 'Losers') { bgClass = 'bg-gray-900 border-orange-500/50'; accentColor = 'text-orange-400'; }
+                if (currentMatch.type.includes('Gran Final')) { bgClass = 'bg-gray-900 border-yellow-400/50'; accentColor = 'text-yellow-400'; }
+
+                activeMatchContainer.innerHTML = `
+                    <div class="match-card border rounded-lg shadow-inner p-6 ${bgClass}">
+                        <div class="text-sm font-black uppercase tracking-widest ${accentColor} mb-6 text-center border-b border-gray-700 pb-3">
+                            FASE: ${currentMatch.type}
+                        </div>
+                        <div class="flex flex-col md:flex-row justify-between items-center w-full gap-6">
+                            <button onclick="reportWin(${currentMatch.id}, 'p1')" class="w-full md:w-5/12 bg-gray-800 hover:bg-green-600 hover:border-green-400 border-2 border-gray-600 text-white transition-all px-4 py-8 rounded-xl shadow-lg text-2xl font-black text-center group">
+                                <span class="block text-xs text-gray-400 group-hover:text-green-200 uppercase mb-1">Ganador</span>
+                                ${currentMatch.p1}
+                            </button>
+                            <span class="text-gray-600 font-black text-4xl italic">VS</span>
+                            <button onclick="reportWin(${currentMatch.id}, 'p2')" class="w-full md:w-5/12 bg-gray-800 hover:bg-green-600 hover:border-green-400 border-2 border-gray-600 text-white transition-all px-4 py-8 rounded-xl shadow-lg text-2xl font-black text-center group">
+                                <span class="block text-xs text-gray-400 group-hover:text-green-200 uppercase mb-1">Ganador</span>
+                                ${currentMatch.p2}
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                queuedMatchesContainer.innerHTML = '';
+                if (matchQueue.length > 1) {
+                    for (let i = 1; i < matchQueue.length; i++) {
+                        const m = matchQueue[i];
+                        let badgeColor = m.type === 'Winners' ? 'bg-blue-900/50 text-blue-300 border-blue-500/30' : (m.type === 'Losers' ? 'bg-orange-900/50 text-orange-300 border-orange-500/30' : 'bg-yellow-900/50 text-yellow-300 border-yellow-500/30');
+                        queuedMatchesContainer.innerHTML += `
+                            <li class="p-3 bg-gray-900 border border-gray-700 rounded-lg flex justify-between items-center shadow-sm">
+                                <span class="font-bold text-gray-200">${m.p1} <span class="text-gray-600 mx-2 text-sm">VS</span> ${m.p2}</span>
+                                <span class="text-xs px-2.5 py-1 rounded border font-bold uppercase ${badgeColor}">${m.type}</span>
+                            </li>
+                        `;
+                    }
+                } else {
+                    queuedMatchesContainer.innerHTML = `<li class="p-4 text-sm text-gray-500 italic text-center bg-gray-900/50 rounded-lg border border-gray-700 border-dashed">No hay partidos en espera.</li>`;
+                }
+
+            } else {
+                activeMatchContainer.innerHTML = `<p class="text-gray-400 italic text-center py-10 bg-gray-900 rounded-lg border border-gray-700 border-dashed">Calculando siguiente emparejamiento...</p>`;
+                queuedMatchesContainer.innerHTML = `<li class="p-4 text-sm text-gray-500 italic text-center bg-gray-900/50 rounded-lg border border-gray-700 border-dashed">Lista vacía.</li>`;
+            }
+
+            const renderList = (arr, emptyText) => arr.length 
+                ? arr.map(p => `<li class="py-3 px-3 border-b border-gray-700 last:border-0 text-gray-300">${p}</li>`).join('') 
+                : `<li class="py-3 text-gray-600 italic text-sm">${emptyText}</li>`;
+
+            document.getElementById('listWinners').innerHTML = renderList(displayWinners, 'Vacío');
+            document.getElementById('listLosers').innerHTML = renderList(displayLosers, 'Vacío');
+            document.getElementById('listEliminados').innerHTML = renderList(poolEliminados, 'Nadie ha sido eliminado');
+        }
+    </script>
+</body>
+</html>
